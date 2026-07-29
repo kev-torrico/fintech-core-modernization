@@ -1,3 +1,3 @@
-public class NotificationServiceImpl {
+public class NotificationsServiceImpl {
     
 }
