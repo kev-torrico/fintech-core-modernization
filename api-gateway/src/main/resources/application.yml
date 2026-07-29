@@ -1,0 +1,26 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      routes:
+        # 1. Microservicio extraído: Notificaciones (ms-notifications)
+        - id: ms-notifications-route
+          uri: http://ms-notifications:8082
+          predicates:
+            - Path=/notifications/**
+
+        # 2. Monolito remanente (Fallback para todo el resto de tráfico)
+        - id: monolith-route
+          uri: http://finbank-monolith:8081
+          predicates:
+            - Path=/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
