@@ -1,0 +1,100 @@
+version: "3.8"
+
+networks:
+  finbank-net:
+    driver: bridge
+
+volumes:
+  postgres_monolith_data:
+  postgres_notifications_data:
+
+services:
+  # 1. MONOLITO MODULAR Y SU BD
+  postgres-monolith:
+    image: postgres:16
+    container_name: postgres-monolith
+    environment:
+      POSTGRES_DB: modular_bank
+      POSTGRES_USER: bank
+      POSTGRES_PASSWORD: bank
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bank -d modular_bank"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_monolith_data:/var/lib/postgresql/data
+    networks:
+      - finbank-net
+
+  finbank-monolith:
+    build:
+      context: ./finbank-monolith
+      dockerfile: Dockerfile
+    container_name: finbank-monolith
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-monolith:5432/modular_bank
+      - SPRING_DATASOURCE_USERNAME=bank
+      - SPRING_DATASOURCE_PASSWORD=bank
+      - SERVER_PORT=8081
+    depends_on:
+      postgres-monolith:
+        condition: service_healthy
+    networks:
+      - finbank-net
+
+  # 2. MICROSERVICIO NOTIFICACIONES Y SU BD EXCLUSIVA
+  postgres-notifications:
+    image: postgres:15-alpine
+    container_name: postgres-notifications
+    environment:
+      POSTGRES_DB: finbank_notifications_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d finbank_notifications_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_notifications_data:/var/lib/postgresql/data
+    networks:
+      - finbank-net
+
+  ms-notifications:
+    build:
+      context: ./ms-notifications
+      dockerfile: Dockerfile
+    container_name: ms-notifications
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-notifications:5432/finbank_notifications_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+    depends_on:
+      postgres-notifications:
+        condition: service_healthy
+    networks:
+      - finbank-net
+
+  # 3. API GATEWAY (Punto de entrada único)
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - ms-notifications
+      - finbank-monolith
+    networks:
+      - finbank-net
