@@ -1,5 +1,3 @@
-version: "3.8"
-
 networks:
   finbank-net:
     driver: bridge
@@ -37,9 +35,10 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "29092"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 15s
     networks:
       - finbank-net
 
@@ -56,7 +55,8 @@ services:
     ports:
       - "8085:8080"
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     networks:
       - finbank-net
 
@@ -73,10 +73,11 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bank -d modular_bank"]
-      interval: 5s
+      test: ["CMD-SHELL", "sh -c 'pg_isready -U bank -d modular_bank'"]
+      interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 40s
     volumes:
       - postgres_monolith_data:/var/lib/postgresql/data
     networks:
@@ -98,6 +99,8 @@ services:
     depends_on:
       postgres-monolith:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
     networks:
       - finbank-net
 
@@ -114,10 +117,15 @@ services:
     ports:
       - "5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d finbank_notifications_db"]
+      test:
+        [
+          "CMD-SHELL",
+          "sh -c 'pg_isready -U postgres -d finbank_notifications_db'",
+        ]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 60s
     volumes:
       - postgres_notifications_data:/var/lib/postgresql/data
     networks:
@@ -138,10 +146,11 @@ services:
       - SPRING_JPA_HIBERNATE_DDL_AUTO=none
       - SPRING_FLYWAY_ENABLED=true
       - SPRING_FLYWAY_BASELINE_ON_MIGRATE=true
-      - JWT_SECRET=${JWT_SECRET:-modular-bank-dev-secret-change-in-production-256bit}
       - SERVER_PORT=8082
     depends_on:
       postgres-notifications:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     networks:
       - finbank-net
@@ -156,6 +165,11 @@ services:
     container_name: api-gateway
     ports:
       - "8080:8080"
+    environment:
+      - MONOLITH_URI=http://finbank-monolith:8081
+      - MS_NOTIFICATIONS_URI=http://ms-notifications:8082
+      - JWT_SECRET=${JWT_SECRET:-modular-bank-dev-secret-change-in-production-256bit}
+      - SERVER_PORT=8080
     depends_on:
       - ms-notifications
       - finbank-monolith
