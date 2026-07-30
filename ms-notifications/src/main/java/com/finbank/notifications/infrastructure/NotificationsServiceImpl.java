@@ -30,6 +30,6 @@ public class NotificationsServiceImpl implements NotificationsService {
     @Override
     @Transactional(readOnly = true)
     public List<Notifications> getForUser(UUID userId) {
-        return notificationsRepository.findByUserIdOrderByCreatedAtDesc(userId.toString());
+        return notificationsRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 }

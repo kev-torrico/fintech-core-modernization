@@ -6,5 +6,5 @@ import java.util.List;
 import java.util.UUID;
 
 public interface NotificationsRepository extends JpaRepository<Notifications, UUID> {
-    List<Notifications> findByUserIdOrderByCreatedAtDesc(String userId);
+    List<Notifications> findByUserIdOrderByCreatedAtDesc(UUID userId);
 }
