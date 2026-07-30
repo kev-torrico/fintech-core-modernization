@@ -1,26 +1,91 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
 
 spring:
   application:
     name: api-gateway
   cloud:
     gateway:
+      httpclient:
+        connect-timeout: 5000
+        response-timeout: 10s
+      default-filters:
+        - RequestHeaderFilter
       routes:
-        # 1. Microservicio extraído: Notificaciones (ms-notifications)
-        - id: ms-notifications-route
-          uri: http://ms-notifications:8082
+        # -------------------------------------------------------------------
+        # 1. DOCUMENTACIÓN OPENAPI (PÚBLICAS)
+        # -------------------------------------------------------------------
+        - id: monolith-api-docs
+          uri: ${MONOLITH_URI:http://finbank-monolith:8081}
           predicates:
-            - Path=/notifications/**
+            - Path=/aggregate/monolith/v3/api-docs
+          filters:
+            - RewritePath=/aggregate/monolith/v3/api-docs, /v3/api-docs
 
-        # 2. Monolito remanente (Fallback para todo el resto de tráfico)
-        - id: monolith-route
-          uri: http://finbank-monolith:8081
+        - id: notifications-api-docs
+          uri: ${MS_NOTIFICATIONS_URI:http://ms-notifications:8082}
           predicates:
-            - Path=/**
+            - Path=/aggregate/notifications/v3/api-docs
+          filters:
+            - RewritePath=/aggregate/notifications/v3/api-docs, /v3/api-docs
+
+        # -------------------------------------------------------------------
+        # 2. RUTAS PÚBLICAS DEL MONOLITO (Auth / Login / Register / Refresh)
+        # SIN AuthenticationFilter
+        # -------------------------------------------------------------------
+        - id: monolith-public-auth
+          uri: ${MONOLITH_URI:http://finbank-monolith:8081}
+          predicates:
+            - Path=/api/v1/auth/login, /api/v1/auth/register, /api/v1/auth/refresh
+          filters:
+            - StripPrefix=2
+
+        # -------------------------------------------------------------------
+        # 3. MICROSERVICIO DE NOTIFICACIONES (PROTEGIDO CON JWT)
+        # -------------------------------------------------------------------
+        - id: ms-notifications-route
+          uri: ${MS_NOTIFICATIONS_URI:http://ms-notifications:8082}
+          predicates:
+            - Path=/api/v1/notifications/**
+          filters:
+            - StripPrefix=2
+            - AuthenticationFilter
+
+        # -------------------------------------------------------------------
+        # 4. RUTAS PROTEGIDAS DEL MONOLITO (Core del banco)
+        # Catch-all de /api/v1/** (salvo las declaradas arriba)
+        # -------------------------------------------------------------------
+        - id: monolith-protected-route
+          uri: ${MONOLITH_URI:http://finbank-monolith:8081}
+          predicates:
+            - Path=/api/v1/**
+          filters:
+            - StripPrefix=2
+            - AuthenticationFilter
+
+# Secret para el JWT
+jwt:
+  secret: ${JWT_SECRET:modular-bank-dev-secret-change-in-production-256bit}
+
+# Agregador de Swagger UI
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: Monolito (Core / Auth)
+        url: /aggregate/monolith/v3/api-docs
+      - name: Notificaciones (ms-notifications)
+        url: /aggregate/notifications/v3/api-docs
 
 management:
   endpoints:
     web:
       exposure:
         include: health,metrics
+# ---------------------------------------------------------------------------
+# Observabilidad / Trazabilidad distribuida (FASE FUTURA — no configurar aún):
+# aquí se añadirán management.tracing.*, spring.zipkin.* / OTEL exporter
+# cuando se integre Micrometer Tracing + Zipkin/Jaeger/OpenTelemetry.
+# ---------------------------------------------------------------------------
