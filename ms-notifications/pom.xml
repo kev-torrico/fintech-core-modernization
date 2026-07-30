@@ -58,15 +58,18 @@
             <artifactId>spring-kafka</artifactId>
         </dependency>
 
-        <!-- Spring Security + JWT: valida el mismo token emitido por el monolito -->
+        <!-- Spring Security: ya no valida JWT, solo confía en la identidad que el
+             api-gateway ya verificó y propagó como headers (X-User-Id / X-User-Roles) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
+
+        <!-- SpringDoc OpenAPI (MVC) para que el api-gateway pueda agregar este /v3/api-docs -->
         <dependency>
-            <groupId>com.auth0</groupId>
-            <artifactId>java-jwt</artifactId>
-            <version>4.4.0</version>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.5.0</version>
         </dependency>
 
         <!-- Lombok -->

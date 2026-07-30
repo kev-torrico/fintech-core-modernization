@@ -39,9 +39,6 @@ finbank:
     topics:
       notifications: notification-events
 
-jwt:
-  secret: ${JWT_SECRET:modular-bank-dev-secret-change-in-production-256bit}
-
 management:
   endpoints:
     web:
