@@ -9,7 +9,60 @@ volumes:
   postgres_notifications_data:
 
 services:
+  # ========================================================
+  # 0. BROKER DE EVENTOS
+  # ========================================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - finbank-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "29092"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - finbank-net
+
+  akhq:
+    image: tchiotludo/akhq:latest
+    container_name: akhq
+    environment:
+      AKHQ_CONFIGURATION: |
+        akhq:
+          connections:
+            finbank-cluster:
+              properties:
+                bootstrap.servers: "kafka:29092"
+    ports:
+      - "8085:8080"
+    depends_on:
+      - kafka
+    networks:
+      - finbank-net
+
+  # ========================================================
   # 1. MONOLITO MODULAR Y SU BD
+  # ========================================================
   postgres-monolith:
     image: postgres:16
     container_name: postgres-monolith
@@ -40,6 +93,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-monolith:5432/modular_bank
       - SPRING_DATASOURCE_USERNAME=bank
       - SPRING_DATASOURCE_PASSWORD=bank
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - SERVER_PORT=8081
     depends_on:
       postgres-monolith:
@@ -47,7 +101,9 @@ services:
     networks:
       - finbank-net
 
+  # ========================================================
   # 2. MICROSERVICIO NOTIFICACIONES Y SU BD EXCLUSIVA
+  # ========================================================
   postgres-notifications:
     image: postgres:15-alpine
     container_name: postgres-notifications
@@ -75,19 +131,24 @@ services:
     ports:
       - "8082:8082"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-notifications:5432/finbank_notifications_db
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-notifications:5432/finbank_notifications_db?sslmode=disable
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - SPRING_JPA_HIBERNATE_DDL_AUTO=none
       - SPRING_FLYWAY_ENABLED=true
       - SPRING_FLYWAY_BASELINE_ON_MIGRATE=true
+      - JWT_SECRET=${JWT_SECRET:-modular-bank-dev-secret-change-in-production-256bit}
+      - SERVER_PORT=8082
     depends_on:
       postgres-notifications:
         condition: service_healthy
     networks:
       - finbank-net
 
-  # 3. API GATEWAY (Punto de entrada único)
+  # ========================================================
+  # 3. API GATEWAY
+  # ========================================================
   api-gateway:
     build:
       context: ./api-gateway
