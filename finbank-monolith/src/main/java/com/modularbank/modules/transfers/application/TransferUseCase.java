@@ -2,6 +2,7 @@ package com.modularbank.modules.transfers.application;
 
 import com.modularbank.modules.accounts.application.AccountsService;
 import com.modularbank.modules.audit.application.AuditService;
+import com.modularbank.modules.notifications.application.NotificationEventPublisher;
 import com.modularbank.modules.notifications.application.NotificationsService;
 import com.modularbank.modules.notifications.domain.NotificationType;
 import com.modularbank.modules.transfers.application.dto.TransferRequest;
@@ -24,6 +25,7 @@ public class TransferUseCase {
     private final TransferRepository transferRepository;
     private final AccountsService accountsService;
     private final NotificationsService notificationsService;
+    private final NotificationEventPublisher notificationEventPublisher;
     private final AuditService auditService;
 
     @Transactional
@@ -51,10 +53,13 @@ public class TransferUseCase {
             .build();
         transfer = transferRepository.save(transfer);
 
-        notificationsService.send(userId, NotificationType.TRANSFER_SENT, Map.of(
+        Map<String, String> notificationPayload = Map.of(
             "amount", request.amount().toPlainString(),
             "targetAccountId", request.targetAccountId().toString()
-        ));
+        );
+
+        notificationsService.send(userId, NotificationType.TRANSFER_SENT, notificationPayload);
+        notificationEventPublisher.publish(userId, NotificationType.TRANSFER_SENT, notificationPayload);
 
         auditService.record(userId, "TRANSFER_EXECUTED", Map.of(
             "transferId", transfer.getId().toString(),
