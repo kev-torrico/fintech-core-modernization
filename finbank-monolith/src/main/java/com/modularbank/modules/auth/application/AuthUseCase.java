@@ -47,7 +47,7 @@ public class AuthUseCase {
             .name(request.name())
             .build();
         userRepository.save(user);
-        return buildAuthResponse(user.getId());
+        return buildAuthResponse(user.getId(), user.getEmail());
     }
 
     @Transactional
@@ -57,7 +57,7 @@ public class AuthUseCase {
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
         }
-        return buildAuthResponse(user.getId());
+        return buildAuthResponse(user.getId(), user.getEmail());
     }
 
     @Transactional
@@ -70,11 +70,13 @@ public class AuthUseCase {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token expired");
         }
         refreshTokenRepository.delete(refreshToken);
-        return buildAuthResponse(refreshToken.getUserId());
+        User user = userRepository.findById(refreshToken.getUserId())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User no longer exists"));
+        return buildAuthResponse(user.getId(), user.getEmail());
     }
 
-    private AuthResponse buildAuthResponse(UUID userId) {
-        String accessToken = jwtUtil.generateAccessToken(userId);
+    private AuthResponse buildAuthResponse(UUID userId, String email) {
+        String accessToken = jwtUtil.generateAccessToken(userId, email);
         String rawRefreshToken = generateSecureToken();
         String hashedToken = hashToken(rawRefreshToken);
         RefreshToken refreshToken = RefreshToken.builder()

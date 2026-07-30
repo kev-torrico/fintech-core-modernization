@@ -1,5 +1,6 @@
 package com.modularbank.modules.transfers;
 
+import com.auth0.jwt.JWT;
 import com.modularbank.shared.BaseIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,18 @@ class TransferIntegrationTest extends BaseIntegrationTest {
     private String accountAId;
     private String accountBId;
 
+    /**
+     * Fuera del api-gateway el Monolito ya no decodifica JWT: la identidad llega en
+     * X-User-Id. Estos tests simulan lo que el AuthenticationFilter del gateway hace
+     * en producción, decodificando localmente el subject del token emitido.
+     */
+    private HttpHeaders authHeaders(String token) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        headers.set("X-User-Id", JWT.decode(token).getSubject());
+        return headers;
+    }
+
     @BeforeEach
     void setUp() {
         String suffix = UUID.randomUUID().toString().substring(0, 8);
@@ -44,21 +57,18 @@ class TransferIntegrationTest extends BaseIntegrationTest {
             Map.of("email", emailB, "password", "Password123!"), Map.class)
             .getBody().get("accessToken");
 
-        HttpHeaders headersA = new HttpHeaders();
-        headersA.setBearerAuth(tokenA);
+        HttpHeaders headersA = authHeaders(tokenA);
         accountAId = (String) rest.exchange("/accounts", HttpMethod.POST,
             new HttpEntity<>(Map.of(), headersA), Map.class).getBody().get("id");
 
-        HttpHeaders headersB = new HttpHeaders();
-        headersB.setBearerAuth(tokenB);
+        HttpHeaders headersB = authHeaders(tokenB);
         accountBId = (String) rest.exchange("/accounts", HttpMethod.POST,
             new HttpEntity<>(Map.of(), headersB), Map.class).getBody().get("id");
     }
 
     @Test
     void transferBetweenAccountsInsufficientFunds() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(tokenA);
+        HttpHeaders headers = authHeaders(tokenA);
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         ResponseEntity<Map> response = rest.exchange("/transfers", HttpMethod.POST,
@@ -73,8 +83,7 @@ class TransferIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void selfTransferReturns422() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(tokenA);
+        HttpHeaders headers = authHeaders(tokenA);
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         ResponseEntity<Map> response = rest.exchange("/transfers", HttpMethod.POST,
@@ -89,8 +98,7 @@ class TransferIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void transferFromAnotherUsersAccountReturns403() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(tokenB);
+        HttpHeaders headers = authHeaders(tokenB);
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         ResponseEntity<Map> response = rest.exchange("/transfers", HttpMethod.POST,
@@ -105,8 +113,7 @@ class TransferIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void historyForOtherUsersAccountReturns403() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(tokenA);
+        HttpHeaders headers = authHeaders(tokenA);
 
         ResponseEntity<Map> response = rest.exchange(
             "/transfers?accountId=" + accountBId,
@@ -120,8 +127,7 @@ class TransferIntegrationTest extends BaseIntegrationTest {
         jdbc.update("UPDATE accounts.accounts SET balance = ? WHERE id = ?::uuid",
             new BigDecimal("1000.0000"), accountAId);
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(tokenA);
+        HttpHeaders headers = authHeaders(tokenA);
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         ResponseEntity<Map> transfer = rest.exchange("/transfers", HttpMethod.POST,
@@ -146,8 +152,7 @@ class TransferIntegrationTest extends BaseIntegrationTest {
         jdbc.update("UPDATE accounts.accounts SET balance = ? WHERE id = ?::uuid",
             new BigDecimal("500.0000"), accountAId);
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(tokenA);
+        HttpHeaders headers = authHeaders(tokenA);
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         rest.exchange("/transfers", HttpMethod.POST,
@@ -168,8 +173,7 @@ class TransferIntegrationTest extends BaseIntegrationTest {
         jdbc.update("UPDATE accounts.accounts SET balance = ? WHERE id = ?::uuid",
             new BigDecimal("500.0000"), accountAId);
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(tokenA);
+        HttpHeaders headers = authHeaders(tokenA);
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         rest.exchange("/transfers", HttpMethod.POST,

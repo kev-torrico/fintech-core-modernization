@@ -1,5 +1,6 @@
 package com.modularbank.modules.accounts;
 
+import com.auth0.jwt.JWT;
 import com.modularbank.shared.BaseIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,11 +24,22 @@ class AccountsIntegrationTest extends BaseIntegrationTest {
             .getBody().get("accessToken");
     }
 
+    /**
+     * Fuera del api-gateway el Monolito ya no decodifica JWT: la identidad llega en
+     * X-User-Id. Estos tests simulan lo que el AuthenticationFilter del gateway hace
+     * en producción, decodificando localmente el subject del token emitido.
+     */
+    private HttpHeaders authHeaders(String token) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        headers.set("X-User-Id", JWT.decode(token).getSubject());
+        return headers;
+    }
+
     @Test
     void createAccountAndGetBalance() {
         String token = registerAndLogin("acc@example.com");
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(token);
+        HttpHeaders headers = authHeaders(token);
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         ResponseEntity<Map> createResponse = rest.exchange(
@@ -47,8 +59,7 @@ class AccountsIntegrationTest extends BaseIntegrationTest {
     void listAccountsReturnsOwnedAccounts() {
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         String token = registerAndLogin("list-" + suffix + "@example.com");
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(token);
+        HttpHeaders headers = authHeaders(token);
 
         rest.exchange("/accounts", HttpMethod.POST, new HttpEntity<>(Map.of(), headers), Map.class);
         rest.exchange("/accounts", HttpMethod.POST, new HttpEntity<>(Map.of(), headers), Map.class);
