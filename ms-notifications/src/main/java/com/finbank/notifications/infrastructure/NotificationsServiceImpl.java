@@ -20,7 +20,7 @@ public class NotificationsServiceImpl implements NotificationsService {
     @Transactional
     public void register(UUID userId, String type, Map<String, String> payload) {
         Notifications notification = Notifications.builder()
-            .userId(userId.toString())
+            .userId(userId)
             .type(NotificationsType.valueOf(type))
             .payload(payload)
             .build();
