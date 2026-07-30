@@ -1,0 +1,14 @@
+package com.finbank.notifications.infrastructure.kafka;
+
+import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
+
+public record NotificationEvent(
+    UUID eventId,
+    UUID userId,
+    String type,
+    Map<String, String> payload,
+    Instant occurredAt
+) {
+}
