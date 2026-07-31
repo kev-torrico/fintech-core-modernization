@@ -5,6 +5,7 @@ networks:
 volumes:
   postgres_monolith_data:
   postgres_notifications_data:
+  postgres_transfers_data:
 
 services:
   # ========================================================
