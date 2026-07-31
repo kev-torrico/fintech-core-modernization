@@ -13,24 +13,7 @@ spring:
         - RequestHeaderFilter
       routes:
         # -------------------------------------------------------------------
-        # 1. DOCUMENTACIÓN OPENAPI (PÚBLICAS)
-        # -------------------------------------------------------------------
-        - id: monolith-api-docs
-          uri: ${MONOLITH_URI:http://finbank-monolith:8081}
-          predicates:
-            - Path=/aggregate/monolith/v3/api-docs
-          filters:
-            - RewritePath=/aggregate/monolith/v3/api-docs, /v3/api-docs
-
-        - id: notifications-api-docs
-          uri: ${MS_NOTIFICATIONS_URI:http://ms-notifications:8082}
-          predicates:
-            - Path=/aggregate/notifications/v3/api-docs
-          filters:
-            - RewritePath=/aggregate/notifications/v3/api-docs, /v3/api-docs
-
-        # -------------------------------------------------------------------
-        # 2. RUTAS PÚBLICAS DEL MONOLITO (Auth / Login / Register / Refresh)
+        # 1. RUTAS PÚBLICAS DEL MONOLITO (Auth / Login / Register / Refresh)
         # SIN AuthenticationFilter
         # -------------------------------------------------------------------
         - id: monolith-public-auth
@@ -41,7 +24,7 @@ spring:
             - StripPrefix=2
 
         # -------------------------------------------------------------------
-        # 3. MICROSERVICIO DE NOTIFICACIONES (PROTEGIDO CON JWT)
+        # 2. MICROSERVICIO DE NOTIFICACIONES (PROTEGIDO CON JWT)
         # -------------------------------------------------------------------
         - id: ms-notifications-route
           uri: ${MS_NOTIFICATIONS_URI:http://ms-notifications:8082}
@@ -52,7 +35,7 @@ spring:
             - AuthenticationFilter
 
         # -------------------------------------------------------------------
-        # 4. RUTAS PROTEGIDAS DEL MONOLITO (Core del banco)
+        # 3. RUTAS PROTEGIDAS DEL MONOLITO (Core del banco)
         # Catch-all de /api/v1/** (salvo las declaradas arriba)
         # -------------------------------------------------------------------
         - id: monolith-protected-route
@@ -67,17 +50,17 @@ spring:
 jwt:
   secret: ${JWT_SECRET:modular-bank-dev-secret-change-in-production-256bit}
 
-# Agregador de Swagger UI
+# -----------------------------------------------------------------------------
+# Documentación: una única especificación OpenAPI, servida por el propio Gateway
+# (ver OpenApiConfig). El Monolito y ms-notifications ya no exponen swagger — sus
+# endpoints públicos se documentan aquí, a mano, como parte de la API unificada.
+# -----------------------------------------------------------------------------
 springdoc:
   api-docs:
     path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
-    urls:
-      - name: Monolito (Core / Auth)
-        url: /aggregate/monolith/v3/api-docs
-      - name: Notificaciones (ms-notifications)
-        url: /aggregate/notifications/v3/api-docs
+    disable-swagger-default-url: true
 
 management:
   endpoints:
