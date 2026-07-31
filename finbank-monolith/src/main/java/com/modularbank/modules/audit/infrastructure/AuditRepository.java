@@ -7,4 +7,6 @@ import java.util.UUID;
 
 public interface AuditRepository extends JpaRepository<AuditEntry, UUID> {
     List<AuditEntry> findByUserIdOrderByCreatedAtDesc(UUID userId);
+
+    boolean existsByEventId(UUID eventId);
 }

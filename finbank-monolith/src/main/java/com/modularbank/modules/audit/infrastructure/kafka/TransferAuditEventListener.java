@@ -23,7 +23,7 @@ public class TransferAuditEventListener {
     @KafkaListener(topics = "${finbank.kafka.topics.transfers}", groupId = "finbank-monolith-audit")
     public void onTransferExecuted(TransferAuditEvent event) {
         log.info("Received transfer audit event {} for transfer {}", event.eventId(), event.transferId());
-        auditService.record(event.userId(), "TRANSFER_EXECUTED", Map.of(
+        auditService.record(event.eventId(), event.userId(), "TRANSFER_EXECUTED", Map.of(
             "transferId", event.transferId().toString(),
             "amount", event.amount().toPlainString()
         ));
