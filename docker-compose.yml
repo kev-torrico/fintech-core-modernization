@@ -195,6 +195,7 @@ services:
       - SPRING_JPA_HIBERNATE_DDL_AUTO=none
       - SPRING_FLYWAY_ENABLED=true
       - SPRING_FLYWAY_BASELINE_ON_MIGRATE=true
+      - GATEWAY_URI=http://api-gateway:8080
       - SERVER_PORT=8083
     depends_on:
       postgres-transfers:
@@ -217,10 +218,12 @@ services:
     environment:
       - MONOLITH_URI=http://finbank-monolith:8081
       - MS_NOTIFICATIONS_URI=http://ms-notifications:8082
+      - MS_TRANSFERS_URI=http://ms-transfers:8083
       - JWT_SECRET=${JWT_SECRET:-modular-bank-dev-secret-change-in-production-256bit}
       - SERVER_PORT=8080
     depends_on:
       - ms-notifications
+      - ms-transfers
       - finbank-monolith
     networks:
       - finbank-net
