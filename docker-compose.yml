@@ -156,6 +156,54 @@ services:
       - finbank-net
 
   # ========================================================
+  # 3. MICROSERVICIO TRANSFERENCIAS Y SU BD EXCLUSIVA
+  # ========================================================
+  postgres-transfers:
+    image: postgres:15-alpine
+    container_name: postgres-transfers
+    environment:
+      POSTGRES_DB: finbank_transfers_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test:
+        ["CMD-SHELL", "sh -c 'pg_isready -U postgres -d finbank_transfers_db'"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    volumes:
+      - postgres_transfers_data:/var/lib/postgresql/data
+    networks:
+      - finbank-net
+
+  ms-transfers:
+    build:
+      context: ./ms-transfers
+      dockerfile: Dockerfile
+    container_name: ms-transfers
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-transfers:5432/finbank_transfers_db?sslmode=disable
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=none
+      - SPRING_FLYWAY_ENABLED=true
+      - SPRING_FLYWAY_BASELINE_ON_MIGRATE=true
+      - SERVER_PORT=8083
+    depends_on:
+      postgres-transfers:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - finbank-net
+
+  # ========================================================
   # 3. API GATEWAY
   # ========================================================
   api-gateway:
