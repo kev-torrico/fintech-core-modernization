@@ -61,10 +61,16 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
-        <!-- Spring Kafka: consumidor de eventos de dominio publicados por el monolito -->
+        <!-- Spring Kafka: productor de los eventos de integración (transfer-events / notification-events) -->
         <dependency>
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>
+        </dependency>
+
+        <!-- WebClient: validación síncrona de cuentas contra el Monolito, vía api-gateway -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
 
         <!-- Spring Security: ya no valida JWT, solo confía en la identidad que el
