@@ -21,6 +21,8 @@ import org.springframework.context.annotation.Configuration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import io.swagger.v3.oas.models.parameters.QueryParameter;
+import io.swagger.v3.oas.models.media.StringSchema;
 
 /**
  * Fuente única de la documentación pública de FinBank. El Gateway no reenvía ni
@@ -144,7 +146,17 @@ public class OpenApiConfig {
                 )))
             .get(securedOperation("Consultar el historial de transferencias de una cuenta", "Transfers",
                 null,
-                responses(apiResponse("200", "Historial de transferencias", null))));
+                responses(apiResponse("200", "Historial de transferencias", null)))
+                .addParametersItem(new QueryParameter()
+                    .name("accountId")
+                    .description("ID de la cuenta (UUID) para consultar el historial")
+                    .required(true)
+                    .schema(new StringSchema()
+                        .format("uuid")
+                        .example("8f715a58-4600-40f3-ad8b-838b62093b8e")
+                    )
+                )
+            );
     }
 
     private PathItem auditPath() {
