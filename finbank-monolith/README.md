@@ -109,6 +109,40 @@ sequenceDiagram
 
 ```
 
+### Diagrama de Secuencia: Happy Path: Failure Path
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Cliente as Cliente HTTP
+    participant GW as API Gateway
+    participant Transf as ms-transfers
+    participant Monolith as finbank-monolith (Accounts)
+    participant Kafka as Apache Kafka
+    participant Notif as ms-notifications
+
+    alt HAPPY PATH (Con Idempotencia)
+        Cliente->>GW: POST /api/v1/transfers (Header: X-Idempotency-Key: 123)
+        GW->>Transf: Forward Request
+        Transf->>Transf: Check Idempotency Key (No procesada)
+        Transf->>Monolith: GET /api/v1/accounts (Validación HTTP)
+        Monolith-->>Transf: 200 OK (Cuentas válidas)
+        Transf->>Transf: Guardar Transferencia en postgres-transfers
+        Transf->>Kafka: Publish Events (notification-events & transfer-events)
+        Transf-->>Cliente: 201 CREATED
+    else FAILURE PATH (Fallos de Red & Circuit Breaker / Retry)
+        Cliente->>GW: POST /api/v1/transfers
+        GW->>Transf: Forward Request
+        Note over Transf, Monolith: Caída transitoria del Monolito
+        loop Retry + Backoff Exponencial (3 Intentos)
+            Transf->>Monolith: GET /api/v1/accounts (Falla / Timeout)
+        end
+        Note over Transf: Circuit Breaker se abre (OPEN State)
+        Transf->>Transf: Exec Fallback Method
+        Transf-->>Cliente: 503 Service Unavailable (Respuesta Degradada Controlada)
+    end
+```
+
 ### Capas internas de cada módulo
 
 ```mermaid
