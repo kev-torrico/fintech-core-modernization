@@ -2,7 +2,6 @@ package com.modularbank.modules.transfers.application;
 
 import com.modularbank.modules.accounts.application.AccountsService;
 import com.modularbank.modules.audit.application.AuditService;
-import com.modularbank.modules.notifications.application.NotificationEventPublisher;
 import com.modularbank.modules.notifications.application.NotificationsService;
 import com.modularbank.modules.notifications.domain.NotificationType;
 import com.modularbank.modules.transfers.application.dto.TransferRequest;
@@ -25,7 +24,6 @@ public class TransferUseCase {
     private final TransferRepository transferRepository;
     private final AccountsService accountsService;
     private final NotificationsService notificationsService;
-    private final NotificationEventPublisher notificationEventPublisher;
     private final AuditService auditService;
 
     @Transactional
@@ -58,8 +56,11 @@ public class TransferUseCase {
             "targetAccountId", request.targetAccountId().toString()
         );
 
+        // Publicación a Kafka deshabilitada: el módulo de transferencias fue extraído a
+        // ms-transfers, que ahora es quien produce los eventos de integración
+        // (transfer-events / notification-events). Este caso de uso queda como código
+        // heredado, inalcanzable vía api-gateway, y no debe emitir nada a Kafka.
         notificationsService.send(userId, NotificationType.TRANSFER_SENT, notificationPayload);
-        notificationEventPublisher.publish(userId, NotificationType.TRANSFER_SENT, notificationPayload);
 
         auditService.record(userId, "TRANSFER_EXECUTED", Map.of(
             "transferId", transfer.getId().toString(),
