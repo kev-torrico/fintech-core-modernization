@@ -128,6 +128,69 @@ graph TD
     GW_Router -->|Ruta: /accounts/**, /audit/**, /api/v1/auth/**| Monolith
 ```
 
+```mermaid
+graph TD
+    Client([Cliente HTTP / Swagger UI])
+
+    %% API Gateway
+    subgraph APIGateway ["API Gateway (Spring Cloud Gateway)"]
+        GW_Auth["Filter: JWT Validation & Header Injection\n(X-User-Id, X-User-Email)"]
+        GW_Router{Path-Based Router}
+    end
+
+    Client -->|http://localhost:8080| GW_Auth
+    GW_Auth --> GW_Router
+
+    %% Broker de Mensajería
+    subgraph MessageBroker ["Message Broker (Apache Kafka)"]
+        TopicTransfers["Topic: transfer-events"]
+    end
+
+    %% MS1: Microservicio de Notificaciones
+    subgraph MS1 ["MS1: ms-notifications"]
+        NotifConsumer["Kafka Consumer"]
+        NotifAPI["GET /notifications"]
+        NotifDB[(postgres-notifications)]
+
+        NotifConsumer -->|Persiste| NotifDB
+        NotifAPI --> NotifDB
+    end
+
+    %% MS2: Microservicio de Transferencias
+    subgraph MS2 ["MS2: ms-transfers (Nuevo)"]
+        TransfAPI["POST, GET /transfers"]
+        TransfService[Transfer Domain Logic]
+        KafkaProducer[Kafka Event Producer]
+        TransfDB[(postgres-transfers)]
+
+        TransfAPI --> TransfService
+        TransfService -->|ACID Transaction| TransfDB
+        TransfService -->|Publica Evento| KafkaProducer
+    end
+
+    %% Monolito Remanente
+    subgraph Monolith ["Monolito Remanente: finbank-monolith"]
+        AuthAPI["POST /api/v1/auth/**"]
+        AccAPI["GET, POST /accounts/**"]
+        AuditAPI["GET /audit"]
+
+        MonolithDB[(postgres-monolith)]
+
+        AuthAPI --> MonolithDB
+        AccAPI --> MonolithDB
+        AuditAPI --> MonolithDB
+    end
+
+    %% Enrutamiento HTTP desde el Gateway
+    GW_Router -->|/notifications/**| NotifAPI
+    GW_Router -->|/transfers/**| TransfAPI
+    GW_Router -->|/accounts/**, /audit/**, /api/v1/auth/**| Monolith
+
+    %% Comunicación Asíncrona entre Microservicios
+    KafkaProducer -->|TransferCompletedEvent| TopicTransfers
+    TopicTransfers -->|Suscripción Asíncrona| NotifConsumer
+```
+
 ### Capas internas de cada módulo
 
 ```mermaid
