@@ -8,11 +8,14 @@ import com.finbank.transfers.domain.TransferStatus;
 import com.finbank.transfers.domain.Transfers;
 import com.finbank.transfers.infrastructure.TransfersRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -29,6 +32,7 @@ import java.util.UUID;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TransfersUseCase {
 
     private final TransfersRepository transfersRepository;
@@ -36,7 +40,17 @@ public class TransfersUseCase {
     private final TransferEventPublisher transferEventPublisher;
 
     @Transactional
-    public Transfers execute(UUID userId, String bearerToken, TransfersRequest request) {
+    public Transfers execute(UUID userId, String bearerToken, String idempotencyKey, TransfersRequest request) {
+        boolean hasIdempotencyKey = idempotencyKey != null && !idempotencyKey.isBlank();
+        if (hasIdempotencyKey) {
+            Optional<Transfers> existing = transfersRepository.findByIdempotencyKey(idempotencyKey);
+            if (existing.isPresent()) {
+                log.info("Idempotency key {} already processed as transfer {}; returning stored result",
+                    idempotencyKey, existing.get().getId());
+                return existing.get();
+            }
+        }
+
         if (request.sourceAccountId().equals(request.targetAccountId())) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                 "Source and target accounts must be different");
@@ -63,9 +77,21 @@ public class TransfersUseCase {
             .targetAccountId(request.targetAccountId())
             .amount(request.amount())
             .reference(request.reference())
+            .idempotencyKey(hasIdempotencyKey ? idempotencyKey : null)
             .status(TransferStatus.COMPLETED)
             .build();
-        transfer = transfersRepository.save(transfer);
+
+        try {
+            transfer = transfersRepository.save(transfer);
+        } catch (DataIntegrityViolationException ex) {
+            // Condición de carrera: otra petición concurrente con la misma X-Idempotency-Key
+            // ganó la escritura primero (índice único). No es un error: es el mismo caso que
+            // el chequeo de arriba, solo que perdimos la carrera por microsegundos.
+            if (hasIdempotencyKey) {
+                return transfersRepository.findByIdempotencyKey(idempotencyKey).orElseThrow(() -> ex);
+            }
+            throw ex;
+        }
 
         transferEventPublisher.publishTransferExecuted(userId, transfer);
 

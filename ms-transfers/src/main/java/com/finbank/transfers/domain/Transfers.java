@@ -30,6 +30,9 @@ public class Transfers {
 
     private String reference;
 
+    @Column(name = "idempotency_key")
+    private String idempotencyKey;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default

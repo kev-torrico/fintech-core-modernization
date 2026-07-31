@@ -46,4 +46,47 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,metrics,info
+        # circuitbreakers: expone /actuator/circuitbreakers y /actuator/circuitbreakerevents
+        include: health,metrics,info,circuitbreakers,circuitbreakerevents
+  health:
+    circuitbreakers:
+      enabled: true
+
+# ---------------------------------------------------------------------------
+# Resilience4j: Circuit Breaker + Retry para AccountsHttpClient (GET /api/v1/accounts
+# y GET /api/v1/accounts/{id}/exists, vía api-gateway). Ambos métodos comparten la
+# instancia "accountsService" porque reflejan la salud de la misma dependencia.
+#
+# Orden de composición explícito (por qué): queremos que los 3 reintentos de un mismo
+# intento lógico cuenten como UN solo resultado para el Circuit Breaker, no como 3
+# fallos independientes. Para eso CircuitBreaker debe envolver a Retry (CB por fuera,
+# Retry por dentro), así que fijamos el order de cada aspecto explícitamente en vez de
+# confiar en el default.
+# ---------------------------------------------------------------------------
+resilience4j:
+  circuitbreaker:
+    circuit-breaker-aspect-order: 1
+    instances:
+      accountsService:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        # Un 401 (token inválido) es un rechazo de negocio, no una falla del servicio:
+        # no debe contar contra el umbral de apertura del circuito.
+        ignore-exceptions:
+          - org.springframework.web.server.ResponseStatusException
+  retry:
+    retry-aspect-order: 2
+    instances:
+      accountsService:
+        max-attempts: 4 # 1 intento inicial + 3 reintentos
+        wait-duration: 1000ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2 # 1s, 2s, 4s
+        retry-exception-predicate: com.finbank.transfers.infrastructure.http.TransientHttpErrorPredicate
+        ignore-exceptions:
+          - org.springframework.web.server.ResponseStatusException

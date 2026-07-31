@@ -25,10 +25,11 @@ public class TransfersController {
     @PostMapping
     public ResponseEntity<?> executeTransfer(@RequestBody @Valid TransfersRequest request,
                                              Authentication auth,
-                                             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+                                             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
+                                             @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey) {
         UUID userId = (UUID) auth.getPrincipal();
         try {
-            Transfers transfer = transfersUseCase.execute(userId, authorization, request);
+            Transfers transfer = transfersUseCase.execute(userId, authorization, idempotencyKey, request);
             return ResponseEntity.status(HttpStatus.CREATED).body(transfer);
         } catch (ResponseStatusException ex) {
             return ResponseEntity.status(ex.getStatusCode())
