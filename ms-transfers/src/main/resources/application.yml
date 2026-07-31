@@ -2,6 +2,10 @@ server:
   port: 8083
 
 spring:
+  main:
+    # spring-boot-starter-webflux está presente solo para usar WebClient; la app sigue
+    # siendo Spring MVC sobre Tomcat, no reactiva.
+    web-application-type: servlet
   application:
     name: ms-transfers
   datasource:
@@ -28,10 +32,15 @@ spring:
       properties:
         spring.json.add.type.headers: false
 
+# Vuelta al api-gateway para validar cuentas (GET /api/v1/accounts, /accounts/{id}/exists),
+# reenviando el mismo Bearer token del usuario autenticado.
 finbank:
+  gateway:
+    uri: ${GATEWAY_URI:http://api-gateway:8080}
   kafka:
     topics:
       notifications: notification-events
+      transfers: transfer-events
 
 management:
   endpoints:
