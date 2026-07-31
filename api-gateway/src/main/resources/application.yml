@@ -35,7 +35,19 @@ spring:
             - AuthenticationFilter
 
         # -------------------------------------------------------------------
-        # 3. RUTAS PROTEGIDAS DEL MONOLITO (Core del banco)
+        # 3. MICROSERVICIO DE TRANSFERENCIAS (PROTEGIDO CON JWT)
+        # Cubre tanto POST /api/v1/transfers como GET /api/v1/transfers
+        # -------------------------------------------------------------------
+        - id: ms-transfers-route
+          uri: ${MS_TRANSFERS_URI:http://ms-transfers:8083}
+          predicates:
+            - Path=/api/v1/transfers/**
+          filters:
+            - StripPrefix=2
+            - AuthenticationFilter
+
+        # -------------------------------------------------------------------
+        # 4. RUTAS PROTEGIDAS DEL MONOLITO (Core del banco)
         # Catch-all de /api/v1/** (salvo las declaradas arriba)
         # -------------------------------------------------------------------
         - id: monolith-protected-route
