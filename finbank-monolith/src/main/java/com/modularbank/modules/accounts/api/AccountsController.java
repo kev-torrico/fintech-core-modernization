@@ -43,4 +43,14 @@ public class AccountsController {
         Money balance = accountsService.getBalance(id);
         return Map.of("amount", balance.amount().toPlainString());
     }
+
+    /**
+     * Chequeo de existencia sin exponer titularidad ni saldo. Pensado para validación
+     * inter-servicio (p. ej. ms-transfers confirmando la cuenta destino de una
+     * transferencia antes de registrarla en su propia base de datos).
+     */
+    @GetMapping("/{id}/exists")
+    public Map<String, Boolean> exists(@PathVariable UUID id) {
+        return Map.of("exists", accountsService.existsById(id));
+    }
 }

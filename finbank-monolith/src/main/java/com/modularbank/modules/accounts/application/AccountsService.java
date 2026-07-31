@@ -11,4 +11,5 @@ public interface AccountsService {
     void debit(UUID accountId, Money amount, String reference);
     void credit(UUID accountId, Money amount, String reference);
     List<AccountSummary> findByOwner(UUID userId);
+    boolean existsById(UUID accountId);
 }

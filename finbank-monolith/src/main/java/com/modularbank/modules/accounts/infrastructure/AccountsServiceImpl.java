@@ -68,6 +68,12 @@ public class AccountsServiceImpl implements AccountsService {
             .toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsById(UUID accountId) {
+        return accountRepository.existsById(accountId);
+    }
+
     private AccountSummary toSummary(Account a) {
         return new AccountSummary(a.getId(), a.getAccountNumber(), a.getBalance());
     }
