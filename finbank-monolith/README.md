@@ -69,149 +69,117 @@ graph TD
     end
 ```
 
-```mermaid
-graph TD
-    Client([Cliente HTTP / Swagger UI])
-
-    %% API Gateway como Puerta de Entrada Única
-    subgraph APIGateway ["API Gateway (Spring Cloud Gateway)"]
-        GW_Auth["Filter: JWT Validation & Header Injection\n(X-User-Id, X-User-Email)"]
-        GW_Router{Path-Based Router}
-    end
-
-    Client -->|http://localhost:8080| GW_Auth
-    GW_Auth --> GW_Router
-
-    %% Microservicio Extraído
-    subgraph MSNotifications ["Microservicio Extraído: ms-notifications"]
-        NotifAPI["GET /notifications"]
-        INotificationsService[Notification Core Logic]
-        NotifDB[(notifications.* DB)]
-
-        NotifAPI --> INotificationsService
-        INotificationsService --> NotifDB
-    end
-
-    %% Monolito
-    subgraph Monolith ["Monolito: finbank-monolith"]
-        AuthAPI["POST /api/v1/auth/**"]
-        AccAPI["GET, POST /accounts/**"]
-        TrAPI["POST, GET /transfers"]
-        AuditAPI["GET /audit"]
-
-        subgraph AuthDomain ["Módulo Auth"]
-            AuthAPI --> AuthUseCase
-            AuthUseCase --> AuthDB[(auth.* DB)]
-        end
-
-        subgraph AccountsDomain ["Módulo Cuentas"]
-            AccAPI --> AccountsUseCase
-            AccountsUseCase --> IAccountsService
-            IAccountsService --> AccountsDB[(accounts.* DB)]
-        end
-
-        subgraph TransfersDomain ["Módulo Transferencias"]
-            TrAPI --> TransferUseCase
-            TransferUseCase -->|Mismo proceso| IAccountsService
-            TransferUseCase -->|Mismo proceso| IAuditService
-            TransferUseCase --> TransfersDB[(transfers.* DB)]
-        end
-
-        subgraph AuditDomain ["Módulo Auditoría"]
-            AuditAPI --> IAuditService
-            IAuditService --> AuditDB[(audit.* DB)]
-        end
-    end
-
-    %% Enrutamiento desde el Gateway (Strangler Fig)
-    GW_Router -->|Ruta: /notifications/**| NotifAPI
-    GW_Router -->|Ruta: /accounts/**, /audit/**, /api/v1/auth/**| Monolith
-```
+### Patron de Consistencia Distribuida
 
 ```mermaid
-graph TD
-    Client([Cliente HTTP / Swagger UI])
+sequenceDiagram
+    autonumber
+    actor Cliente as Cliente / API Gateway
+    participant TxService as ms-transfers
+    participant TxDB as postgres-transfers
+    participant Kafka as Apache Kafka
+    participant NotifService as ms-notifications
+    participant NotifDB as postgres-notifications
+    participant AuditService as finbank-monolith (Audit)
+    participant MonolithDB as postgres-monolith
 
-    %% API Gateway
-    subgraph APIGateway ["API Gateway (Spring Cloud Gateway)"]
-        GW_Auth["Filter: JWT Validation & Header Injection\n(X-User-Id, X-User-Email)"]
-        GW_Router{Path-Based Router}
+    rect rgb(235, 245, 255)
+        Cliente->>TxService: POST /api/v1/transfers
+        TxService->>TxDB: BEGIN TRANSACTION
+        TxService->>TxDB: INSERT INTO transfers (status = 'COMPLETED')
+        TxService->>TxDB: COMMIT
+        TxService-->>Cliente: 201 CREATED (Respuesta Inmediata)
     end
 
-    Client -->|http://localhost:8080| GW_Auth
-    GW_Auth --> GW_Router
+    rect rgb(240, 253, 244)
+        par Publicación de Eventos
+            TxService->>Kafka: Publish (topic: notification-events)
+        and
+            TxService->>Kafka: Publish (topic: transfer-events)
+        end
 
-    %% Broker de Mensajería
-    subgraph MessageBroker ["Message Broker (Apache Kafka)"]
-        TopicTransfers["Topic: transfer-events"]
+        par Consumo ms-notifications
+            Kafka->>NotifService: Consume (NotificationEvent)
+            NotifService->>NotifDB: INSERT INTO notifications
+        and Consumo Módulo Auditoría
+            Kafka->>AuditService: Consume (TransferAuditEvent)
+            AuditService->>MonolithDB: INSERT INTO audit_entries
+        end
     end
 
-    %% MS1: Microservicio de Notificaciones
-    subgraph MS1 ["MS1: ms-notifications"]
-        NotifConsumer["Kafka Consumer"]
-        NotifAPI["GET /notifications"]
-        NotifDB[(postgres-notifications)]
-
-        NotifConsumer -->|Persiste| NotifDB
-        NotifAPI --> NotifDB
-    end
-
-    %% MS2: Microservicio de Transferencias
-    subgraph MS2 ["MS2: ms-transfers (Nuevo)"]
-        TransfAPI["POST, GET /transfers"]
-        TransfService[Transfer Domain Logic]
-        KafkaProducer[Kafka Event Producer]
-        TransfDB[(postgres-transfers)]
-
-        TransfAPI --> TransfService
-        TransfService -->|ACID Transaction| TransfDB
-        TransfService -->|Publica Evento| KafkaProducer
-    end
-
-    %% Monolito Remanente
-    subgraph Monolith ["Monolito Remanente: finbank-monolith"]
-        AuthAPI["POST /api/v1/auth/**"]
-        AccAPI["GET, POST /accounts/**"]
-        AuditAPI["GET /audit"]
-
-        MonolithDB[(postgres-monolith)]
-
-        AuthAPI --> MonolithDB
-        AccAPI --> MonolithDB
-        AuditAPI --> MonolithDB
-    end
-
-    %% Enrutamiento HTTP desde el Gateway
-    GW_Router -->|/notifications/**| NotifAPI
-    GW_Router -->|/transfers/**| TransfAPI
-    GW_Router -->|/accounts/**, /audit/**, /api/v1/auth/**| Monolith
-
-    %% Comunicación Asíncrona entre Microservicios
-    KafkaProducer -->|TransferCompletedEvent| TopicTransfers
-    TopicTransfers -->|Suscripción Asíncrona| NotifConsumer
 ```
 
 ### Capas internas de cada módulo
 
 ```mermaid
-graph LR
-    subgraph módulo
-        API["api/\n(Controller)"]
-        APP["application/\n(UseCase + Interface)"]
-        INFRA["infrastructure/\n(ServiceImpl + Repository)"]
-        DOMAIN["domain/\n(Entity)"]
+graph TD
+    Client([Cliente HTTP / Postman / Swagger UI])
+
+    %% API Gateway
+    subgraph APIGateway ["API Gateway (Spring Cloud Gateway)"]
+        GW_Auth["Filter: JWT Authentication & Header Injection<br/>(X-User-Id, X-User-Roles)"]
+        GW_Router{Path-Based Router}
     end
 
-    API --> APP
-    APP --> DOMAIN
-    INFRA --> APP
-    INFRA --> DOMAIN
+    Client -->|http://localhost:8080| GW_Auth
+    GW_Auth --> GW_Router
 
-    subgraph "otros módulos"
-        EXT["application/\n(Interface pública)"]
+    %% Broker de Mensajería Kafka
+    subgraph MessageBroker ["Message Broker (Apache Kafka)"]
+        TopicNotif["Topic: notification-events"]
+        TopicAudit["Topic: transfer-events"]
     end
 
-    APP -.->|"solo a través\nde interfaces"| EXT
+    %% MS1: Microservicio de Notificaciones
+    subgraph MS1 ["MS1: ms-notifications"]
+        NotifConsumer["Kafka Consumer<br/>(groupId: ms-notifications)"]
+        NotifAPI["GET /api/v1/notifications"]
+        NotifDB[(postgres-notifications)]
+
+        NotifConsumer -->|Guarda notificación| NotifDB
+        NotifAPI --> NotifDB
+    end
+
+    %% MS2: Microservicio de Transferencias
+    subgraph MS2 ["MS2: ms-transfers (Arquitectura Hexagonal)"]
+        TransfAPI["POST, GET /api/v1/transfers"]
+        TransfUseCase[TransfersUseCase / Domain Logic]
+        AccountsHttpClient["Adapters/Out/Http<br/>(AccountsHttpClient - WebClient)"]
+        KafkaProducer["Adapters/Out/Kafka<br/>(KafkaTransferEventPublisher)"]
+        TransfDB[(postgres-transfers)]
+
+        TransfAPI --> TransfUseCase
+        TransfUseCase -->|1. Valida cuentas vía HTTP| AccountsHttpClient
+        TransfUseCase -->|2. ACID Transaction| TransfDB
+        TransfUseCase -->|3. Emite eventos| KafkaProducer
+    end
+
+    %% Monolito Remanente
+    subgraph Monolith ["Monolito Remanente: finbank-monolith"]
+        AuthAPI["POST /api/v1/auth/**"]
+        AccAPI["GET /api/v1/accounts<br/>GET /accounts/{id}/exists"]
+        AuditListener["Kafka Consumer / Audit Listener<br/>(groupId: finbank-monolith-audit)"]
+        MonolithDB[(postgres-monolith)]
+
+        AuthAPI --> MonolithDB
+        AccAPI --> MonolithDB
+        AuditListener -->|Guarda traza de auditoría| MonolithDB
+    end
+
+    %% Enrutamiento HTTP desde el Gateway
+    GW_Router -->|/api/v1/notifications/**| NotifAPI
+    GW_Router -->|/api/v1/transfers/**| TransfAPI
+    GW_Router -->|/api/v1/auth/**, /api/v1/accounts/**| Monolith
+
+    %% Integración HTTP Síncrona (Validación de Cuentas)
+    AccountsHttpClient -->|GET /api/v1/accounts<br/>Bearer Token Forwarding| GW_Router
+
+    %% Integración Asíncrona (Event-Driven Architecture)
+    KafkaProducer -->|NotificationEvent| TopicNotif
+    KafkaProducer -->|TransferAuditEvent| TopicAudit
+
+    TopicNotif -->|Suscripción| NotifConsumer
+    TopicAudit -->|Suscripción| AuditListener
 ```
 
 ### Aislamiento de schemas en PostgreSQL
