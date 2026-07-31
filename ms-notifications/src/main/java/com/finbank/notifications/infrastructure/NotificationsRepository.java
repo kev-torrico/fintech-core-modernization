@@ -7,4 +7,6 @@ import java.util.UUID;
 
 public interface NotificationsRepository extends JpaRepository<Notifications, UUID> {
     List<Notifications> findByUserIdOrderByCreatedAtDesc(UUID userId);
+
+    boolean existsByEventId(UUID eventId);
 }

@@ -6,6 +6,11 @@ import java.util.Map;
 import java.util.UUID;
 
 public interface NotificationsService {
-    void register(UUID userId, String type, Map<String, String> payload);
+    /**
+     * Idempotente respecto a eventId: si ya existe una notificación con ese eventId,
+     * no vuelve a insertarla (protege contra la redelivery del consumidor Kafka, tanto
+     * por reintentos de DefaultErrorHandler como por rebalanceos/reconexiones).
+     */
+    void register(UUID eventId, UUID userId, String type, Map<String, String> payload);
     List<Notifications> getForUser(UUID userId);
 }

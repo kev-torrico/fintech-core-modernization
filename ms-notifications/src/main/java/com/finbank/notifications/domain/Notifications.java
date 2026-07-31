@@ -21,6 +21,9 @@ public class Notifications {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Column(name = "event_id")
+    private UUID eventId;
+
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 

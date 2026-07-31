@@ -16,6 +16,6 @@ public class NotificationEventListener {
     @KafkaListener(topics = "${finbank.kafka.topics.notifications}", groupId = "${spring.kafka.consumer.group-id}")
     public void onNotificationEvent(NotificationEvent event) {
         log.info("Received notification event {} for user {} (type={})", event.eventId(), event.userId(), event.type());
-        notificationsService.register(event.userId(), event.type(), event.payload());
+        notificationsService.register(event.eventId(), event.userId(), event.type(), event.payload());
     }
 }
