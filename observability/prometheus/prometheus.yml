@@ -1,0 +1,32 @@
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: api-gateway
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["api-gateway:8080"]
+
+  - job_name: finbank-monolith
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["finbank-monolith:8081"]
+
+  - job_name: ms-notifications
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["ms-notifications:8082"]
+
+  - job_name: ms-transfers
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["ms-transfers:8083"]
+
+  - job_name: kafka-exporter
+    static_configs:
+      - targets: ["kafka-exporter:9308"]
