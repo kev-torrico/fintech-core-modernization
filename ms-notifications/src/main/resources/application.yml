@@ -33,6 +33,11 @@ spring:
         spring.json.trusted.packages: "*"
         spring.json.use.type.headers: false
         spring.json.value.default.type: com.finbank.notifications.infrastructure.kafka.NotificationEvent
+    # Habilita que @KafkaListener cree un span hijo de la traza propagada en los headers
+    # del mensaje (traceparent) — así el consumo de notification-events queda enlazado a
+    # la traza que arrancó en el api-gateway / ms-transfers.
+    listener:
+      observation-enabled: true
 
 finbank:
   kafka:
@@ -43,4 +48,20 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,metrics,info
+        include: health,metrics,info,prometheus
+  tracing:
+    sampling:
+      probability: 1.0
+    propagation:
+      type: W3C
+  zipkin:
+    tracing:
+      endpoint: ${MANAGEMENT_ZIPKIN_TRACING_ENDPOINT:http://zipkin:9411/api/v2/spans}
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99

@@ -10,6 +10,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.slf4j.MDC;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
@@ -35,11 +36,19 @@ public class UserHeaderAuthFilter extends OncePerRequestFilter {
                 List<GrantedAuthority> authorities = parseRoles(request.getHeader("X-User-Roles"));
                 var auth = new UsernamePasswordAuthenticationToken(userId, null, authorities);
                 SecurityContextHolder.getContext().setAuthentication(auth);
+                // Contexto de negocio para logs estructurados (ver logback-spring.xml);
+                // se limpia siempre en el finally para no filtrarse a la siguiente
+                // petición que reutilice el mismo hilo del pool de Tomcat.
+                MDC.put("userId", userId.toString());
             } catch (IllegalArgumentException e) {
                 SecurityContextHolder.clearContext();
             }
         }
-        chain.doFilter(request, response);
+        try {
+            chain.doFilter(request, response);
+        } finally {
+            MDC.remove("userId");
+        }
     }
 
     private List<GrantedAuthority> parseRoles(String rolesHeader) {
