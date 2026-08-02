@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: api-gateway
+  # WebFlux es reactivo: sin esto, el MDC (traceId/spanId/userId) no sobrevive el salto
+  # de un operador de Reactor a otro y los logs pierden la correlación con la traza.
+  reactor:
+    context-propagation: auto
   cloud:
     gateway:
       httpclient:
@@ -75,9 +79,28 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,metrics
-# ---------------------------------------------------------------------------
-# Observabilidad / Trazabilidad distribuida (FASE FUTURA — no configurar aún):
-# aquí se añadirán management.tracing.*, spring.zipkin.* / OTEL exporter
-# cuando se integre Micrometer Tracing + Zipkin/Jaeger/OpenTelemetry.
-# ---------------------------------------------------------------------------
+        include: health,metrics,prometheus
+  # ---------------------------------------------------------------------------
+  # Trazas distribuidas: Micrometer Tracing (bridge Brave) -> Zipkin. Ver ADR-0001.
+  # ---------------------------------------------------------------------------
+  tracing:
+    sampling:
+      probability: 1.0 # 100% en dev/demo; bajar en producción (p. ej. 0.1)
+    propagation:
+      type: W3C # cabecera estándar `traceparent`, en vez de B3 propietario
+  zipkin:
+    tracing:
+      endpoint: ${MANAGEMENT_ZIPKIN_TRACING_ENDPOINT:http://zipkin:9411/api/v2/spans}
+  # ---------------------------------------------------------------------------
+  # Métricas: expuestas en formato Prometheus. P99 de latencia habilitado por
+  # meter explícitamente (Prometheus calcula el percentil real a partir del
+  # histograma; sin esto solo se exponen agregados, no percentiles).
+  # ---------------------------------------------------------------------------
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99

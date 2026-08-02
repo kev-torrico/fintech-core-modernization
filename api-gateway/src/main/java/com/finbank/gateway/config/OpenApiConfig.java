@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 import io.swagger.v3.oas.models.parameters.QueryParameter;
 import io.swagger.v3.oas.models.media.StringSchema;
-
+import io.swagger.v3.oas.models.parameters.Parameter;
 /**
  * Fuente única de la documentación pública de FinBank. El Gateway no reenvía ni
  * agrega los /v3/api-docs del Monolito o de ms-notifications (esos servicios ya no
@@ -107,7 +107,43 @@ public class OpenApiConfig {
                 apiResponse("401", "Refresh token inválido o expirado", null)
             )));
     }
+        // ---------------------------------------------------------------------
+        // Transferencias (ms-transfers) — protegido, exige X-Idempotency-Key
+        // ---------------------------------------------------------------------
 
+        private PathItem transfersPath() {
+            return new PathItem()
+                .post(securedOperation(
+                    "Crear una nueva transferencia entre cuentas", 
+                    "Transfers",
+                    jsonBody(Map.of(
+                        "sourceAccountId", "b7a54a2a-718e-4a60-9b37-123456789abc",
+                        "targetAccountId", "c8b65b3b-829f-5b71-ac48-987654321def",
+                        "amount", 150.00
+                    )),
+                    responses(
+                        apiResponse("201", "Transferencia procesada exitosamente", jsonExample(Map.of(
+                            "id", "t9z88111-2222-3333-4444-555555555555",
+                            "status", "COMPLETED",
+                            "amount", 150.00
+                        ))),
+                        apiResponse("400", "Petición inválida o saldo insuficiente", null),
+                        apiResponse("503", "Servicio no disponible (Circuit Breaker activo)", null)
+                    )
+                ).addParametersItem(new Parameter()
+                    .in("header")
+                    .name("X-Idempotency-Key")
+                    .description("Clave única opcional para garantizar idempotencia en la transacción (ej. UUID v4)")
+                    .required(false)
+                    .schema(new Schema<String>().type("string").example("9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"))
+                ))
+                .get(securedOperation(
+                    "Listar las transferencias del usuario autenticado", 
+                    "Transfers",
+                    null,
+                    responses(apiResponse("200", "Historial de transferencias", null))
+                ));
+        }
     // ---------------------------------------------------------------------
     // Core del banco (Monolito) — protegidos, heredan el Bearer global
     // ---------------------------------------------------------------------
@@ -131,32 +167,6 @@ public class OpenApiConfig {
                 apiResponse("200", "Saldo actual", jsonExample(Map.of("amount", "1000.0000"))),
                 apiResponse("403", "La cuenta no pertenece al usuario autenticado", null)
             )));
-    }
-
-    private PathItem transfersPath() {
-        return new PathItem()
-            .post(securedOperation("Ejecutar una transferencia entre cuentas", "Transfers",
-                jsonBody(Map.of(
-                    "sourceAccountId", "b7a5...", "targetAccountId", "9c3f...",
-                    "amount", "100.00", "reference", "invoice-42")),
-                responses(
-                    apiResponse("201", "Transferencia registrada", null),
-                    apiResponse("403", "La cuenta origen no pertenece al usuario", null),
-                    apiResponse("422", "Fondos insuficientes o cuentas inválidas", null)
-                )))
-            .get(securedOperation("Consultar el historial de transferencias de una cuenta", "Transfers",
-                null,
-                responses(apiResponse("200", "Historial de transferencias", null)))
-                .addParametersItem(new QueryParameter()
-                    .name("accountId")
-                    .description("ID de la cuenta (UUID) para consultar el historial")
-                    .required(true)
-                    .schema(new StringSchema()
-                        .format("uuid")
-                        .example("8f715a58-4600-40f3-ad8b-838b62093b8e")
-                    )
-                )
-            );
     }
 
     private PathItem auditPath() {
