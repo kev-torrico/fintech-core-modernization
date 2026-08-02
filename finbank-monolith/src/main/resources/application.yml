@@ -1,4 +1,6 @@
 spring:
+  application:
+    name: finbank-monolith
   datasource:
     url: jdbc:postgresql://localhost:5432/modular_bank
     username: ${DB_USER:bank}
@@ -27,6 +29,11 @@ spring:
         spring.json.trusted.packages: "*"
         spring.json.use.type.headers: false
         spring.json.value.default.type: com.modularbank.modules.audit.infrastructure.kafka.TransferAuditEvent
+    # Habilita que @KafkaListener cree un span hijo de la traza propagada en los headers
+    # del mensaje (traceparent) — así el consumo de transfer-events queda enlazado a la
+    # traza que arrancó en el api-gateway / ms-transfers.
+    listener:
+      observation-enabled: true
 
 jwt:
   secret: ${JWT_SECRET:modular-bank-dev-secret-change-in-production-256bit}
@@ -38,6 +45,28 @@ finbank:
     topics:
       notifications: notification-events
       transfers: transfer-events
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  tracing:
+    sampling:
+      probability: 1.0
+    propagation:
+      type: W3C
+  zipkin:
+    tracing:
+      endpoint: ${MANAGEMENT_ZIPKIN_TRACING_ENDPOINT:http://zipkin:9411/api/v2/spans}
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
 
 server:
   port: 8081
