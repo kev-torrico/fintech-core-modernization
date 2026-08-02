@@ -9,6 +9,8 @@ import com.finbank.transfers.domain.Transfers;
 import com.finbank.transfers.infrastructure.TransfersRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.logstash.logback.argument.StructuredArguments;
+import org.slf4j.MDC;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -42,6 +44,22 @@ public class TransfersUseCase {
     @Transactional
     public Transfers execute(UUID userId, String bearerToken, String idempotencyKey, TransfersRequest request) {
         boolean hasIdempotencyKey = idempotencyKey != null && !idempotencyKey.isBlank();
+        // operationId: contexto de negocio para logs estructurados (ver logback-spring.xml).
+        // Se usa la propia X-Idempotency-Key como identificador de la operación cuando el
+        // cliente la envía — es, por definición, el identificador único de "este intento
+        // de transferencia" a lo largo de reintentos del cliente.
+        if (hasIdempotencyKey) {
+            MDC.put("operationId", idempotencyKey);
+        }
+        try {
+            return doExecute(userId, bearerToken, idempotencyKey, hasIdempotencyKey, request);
+        } finally {
+            MDC.remove("operationId");
+        }
+    }
+
+    private Transfers doExecute(UUID userId, String bearerToken, String idempotencyKey,
+                                boolean hasIdempotencyKey, TransfersRequest request) {
         if (hasIdempotencyKey) {
             Optional<Transfers> existing = transfersRepository.findByIdempotencyKey(idempotencyKey);
             if (existing.isPresent()) {
@@ -94,6 +112,12 @@ public class TransfersUseCase {
         }
 
         transferEventPublisher.publishTransferExecuted(userId, transfer);
+
+        log.info("Transfer executed",
+            StructuredArguments.kv("transferId", transfer.getId()),
+            StructuredArguments.kv("sourceAccountId", transfer.getSourceAccountId()),
+            StructuredArguments.kv("targetAccountId", transfer.getTargetAccountId()),
+            StructuredArguments.kv("amount", transfer.getAmount()));
 
         return transfer;
     }

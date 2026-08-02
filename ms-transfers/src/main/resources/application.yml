@@ -31,6 +31,12 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
         spring.json.add.type.headers: false
+    # Habilita que KafkaTemplate.send(...) cree un span hijo de la traza HTTP activa (la
+    # que llegó del api-gateway) y propague su contexto (traceparent) como header del
+    # mensaje — así ms-notifications y el consumidor de auditoría del Monolito heredan
+    # la misma traza.
+    template:
+      observation-enabled: true
 
 # Vuelta al api-gateway para validar cuentas (GET /api/v1/accounts, /accounts/{id}/exists),
 # reenviando el mismo Bearer token del usuario autenticado.
@@ -46,11 +52,29 @@ management:
   endpoints:
     web:
       exposure:
-        # circuitbreakers: expone /actuator/circuitbreakers y /actuator/circuitbreakerevents
-        include: health,metrics,info,circuitbreakers,circuitbreakerevents
+        include: health,metrics,info,prometheus,circuitbreakers,circuitbreakerevents
+  endpoint:
+    health:
+      show-details: always
   health:
     circuitbreakers:
       enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+    propagation:
+      type: W3C
+  zipkin:
+    tracing:
+      endpoint: ${MANAGEMENT_ZIPKIN_TRACING_ENDPOINT:http://zipkin:9411/api/v2/spans}
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
 
 # ---------------------------------------------------------------------------
 # Resilience4j: Circuit Breaker + Retry para AccountsHttpClient (GET /api/v1/accounts
