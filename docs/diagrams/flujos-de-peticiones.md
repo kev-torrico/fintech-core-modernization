@@ -7,7 +7,6 @@ como por Kafka. Complementa el [diagrama general](../../README.md#diagrama-gener
 del README raíz (que muestra la topología estática) con la secuencia temporal de cada
 caso de uso.
 
-> **Ya existen en el repositorio** (no se duplican aquí, solo se referencian):
 > - [Patrón de consistencia distribuida (Saga)](../../finbank-monolith/README.md#patron-de-consistencia-distribuida) — publicación y consumo paralelo de `NotificationEvent`/`TransferAuditEvent` tras crear una transferencia.
 > - [Happy Path vs Failure Path](../../finbank-monolith/README.md#diagrama-de-secuencia-happy-path-vs-failure-path) — la misma transferencia con el Monolito caído, Circuit Breaker abierto y respuesta degradada.
 >
@@ -95,7 +94,7 @@ Detalle interno de `TransfersUseCase.execute(...)` en `ms-transfers`: el orden r
 las validaciones (idempotencia → cuentas distintas → titularidad del origen →
 existencia del destino → saldo) antes de persistir y publicar eventos. Complementa el
 diagrama de Saga ya existente en `finbank-monolith/README.md`, mostrando qué pasa
-*dentro* de `ms-transfers` antes de que se publique cualquier evento.
+_dentro_ de `ms-transfers` antes de que se publique cualquier evento.
 
 ```mermaid
 sequenceDiagram
@@ -239,7 +238,7 @@ sequenceDiagram
 `notification-events` con un `DefaultErrorHandler` + `ExponentialBackOff` (1s, 2s, 4s;
 máximo 3 reintentos). Si la causa del fallo no se resuelve (p. ej. la base de datos
 sigue caída), el mensaje se descarta y el offset avanza — no hay una DLQ configurada en
-este incremento, solo el log de auditoría del *recoverer*.
+este incremento, solo el log de auditoría del _recoverer_.
 
 ```mermaid
 sequenceDiagram
