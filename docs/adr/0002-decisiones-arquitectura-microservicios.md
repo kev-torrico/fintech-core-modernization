@@ -4,7 +4,7 @@
 **Contexto del sistema:** migración progresiva del monolito modular FinBank (Auth,
 Accounts, Transfers, Notifications, Audit) hacia microservicios mediante Strangler Fig,
 descrita en el [README de la raíz](../../README.md). Este documento reúne las decisiones
-de arquitectura tomadas durante las 5 fases del reto (extracción del primer módulo,
+de arquitectura tomadas durante las 5 fases(extracción del primer módulo,
 segunda extracción y comunicación asíncrona, resiliencia y contratos de eventos,
 observabilidad, y el análisis de trade-offs final).
 
@@ -38,9 +38,9 @@ arriesgar la consistencia transaccional del núcleo bancario.
 
 **Consecuencias:**
 
-- *Positivas:* menor riesgo operativo en la primera fase; independización de la
+- _Positivas:_ menor riesgo operativo en la primera fase; independización de la
   escalabilidad de envío de correos/alertas; creación del pipeline de eventos reutilizable.
-- *Negativas / Deuda:* necesidad de gestionar una base de datos propia para auditoría de
+- _Negativas / Deuda:_ necesidad de gestionar una base de datos propia para auditoría de
   notificaciones desde el día uno.
 
 ---
@@ -68,9 +68,9 @@ Permite escalar las transacciones financieras de forma independiente del monolit
 
 **Consecuencias:**
 
-- *Positivas:* escalamiento independiente de la lógica de transferencias; aislamiento de
+- _Positivas:_ escalamiento independiente de la lógica de transferencias; aislamiento de
   fallos durante picos de operación.
-- *Negativas / Deuda:* introducción de consistencia eventual al comunicarse con el
+- _Negativas / Deuda:_ introducción de consistencia eventual al comunicarse con el
   monolito (`finbank-monolith`) y procesamiento asíncrono para eventos posteriores.
 
 ---
@@ -82,7 +82,7 @@ Permite escalar las transacciones financieras de forma independiente del monolit
 **Estado:** Aprobado
 
 **Contexto:** con la coexistencia del monolito y múltiples microservicios, los clientes
-externos requerían un punto de entrada único (*single point of entry*) que manejara el
+externos requerían un punto de entrada único (_single point of entry_) que manejara el
 enrutamiento, la seguridad JWT y la abstracción de URLs internas.
 
 **Opciones evaluadas:**
@@ -98,9 +98,9 @@ unificado y validador de tokens JWT.
 
 **Consecuencias:**
 
-- *Positivas:* centralización de la seguridad (JWT) y ruteo dinámico; instrumentación de
+- _Positivas:_ centralización de la seguridad (JWT) y ruteo dinámico; instrumentación de
   trazas desde el borde (`api-gateway`).
-- *Negativas / Deuda:* constituye un punto único de fallo (SPOF) si no se despliega en
+- _Negativas / Deuda:_ constituye un punto único de fallo (SPOF) si no se despliega en
   alta disponibilidad.
 
 ---
@@ -130,9 +130,9 @@ propagación de contexto de Micrometer activada.
 
 **Consecuencias:**
 
-- *Positivas:* replay de eventos, desacoplamiento temporal de microservicios y soporte
+- _Positivas:_ replay de eventos, desacoplamiento temporal de microservicios y soporte
   para auditoría pasiva.
-- *Negativas / Deuda:* complejidad adicional para mantener la sincronización y la
+- _Negativas / Deuda:_ complejidad adicional para mantener la sincronización y la
   necesidad de manejar el consumer group lag.
 
 ---
@@ -160,8 +160,8 @@ logs de envío y estados de notificaciones.
 
 **Consecuencias:**
 
-- *Positivas:* aislamiento de datos total; administración uniforme con el resto del stack.
-- *Negativas / Deuda:* aumento en la cantidad de contenedores y recursos de base de datos
+- _Positivas:_ aislamiento de datos total; administración uniforme con el resto del stack.
+- _Negativas / Deuda:_ aumento en la cantidad de contenedores y recursos de base de datos
   a monitorear.
 
 ---
@@ -190,9 +190,9 @@ idempotencia sin depender del esquema del monolito.
 
 **Consecuencias:**
 
-- *Positivas:* autonomía de despliegue y migración mediante Flyway; garantía de fronteras
-  de contexto (*bounded context*).
-- *Negativas / Deuda:* imposibilidad de hacer `JOIN`s SQL con la tabla de
+- _Positivas:_ autonomía de despliegue y migración mediante Flyway; garantía de fronteras
+  de contexto (_bounded context_).
+- _Negativas / Deuda:_ imposibilidad de hacer `JOIN`s SQL con la tabla de
   cuentas/usuarios del monolito.
 
 ---
@@ -221,9 +221,9 @@ de idempotencia en las peticiones HTTP y en los consumidores de Kafka.
 
 **Consecuencias:**
 
-- *Positivas:* sistema altamente tolerante a fallos y sin bloqueos síncronos de larga
+- _Positivas:_ sistema altamente tolerante a fallos y sin bloqueos síncronos de larga
   duración.
-- *Negativas / Deuda:* la consistencia es eventual; requiere lógica explícita para evitar
+- _Negativas / Deuda:_ la consistencia es eventual; requiere lógica explícita para evitar
   el doble procesamiento de eventos.
 
 ---
@@ -252,9 +252,9 @@ paquetes `controller`, `service`, `repository`, `model`/`entity`, `config` y `dt
 
 **Consecuencias:**
 
-- *Positivas:* curva de aprendizaje homogénea para el equipo; código mantenible y
+- _Positivas:_ curva de aprendizaje homogénea para el equipo; código mantenible y
   testeable.
-- *Negativas / Deuda:* ligero acoplamiento de las clases de servicio a las anotaciones
+- _Negativas / Deuda:_ ligero acoplamiento de las clases de servicio a las anotaciones
   de Spring.
 
 ---
@@ -284,9 +284,9 @@ través de llamadas HTTP y comunicación asíncrona mediante Kafka.
 
 **Consecuencias:**
 
-- *Positivas:* trazabilidad distribuida end-to-end con propagación de `traceId` en HTTP y
+- _Positivas:_ trazabilidad distribuida end-to-end con propagación de `traceId` en HTTP y
   cabeceras de Kafka.
-- *Negativas / Deuda:* costo de CPU/red para el envío de spans y recolección de métricas.
+- _Negativas / Deuda:_ costo de CPU/red para el envío de spans y recolección de métricas.
 
 > El detalle técnico de esta decisión (alternativas descartadas con más profundidad,
 > configuración de propagación de contexto en WebFlux, formato de logs) está en
@@ -323,9 +323,9 @@ mensaje de Kafka.
 
 **Consecuencias:**
 
-- *Positivas:* código limpio, sin sobrecarga de wrappers; integración directa y sin
+- _Positivas:_ código limpio, sin sobrecarga de wrappers; integración directa y sin
   fricción con los modelos del dominio de Spring Boot.
-- *Negativas / Deuda:* si cambia la estructura del DTO de forma destructiva, requiere
+- _Negativas / Deuda:_ si cambia la estructura del DTO de forma destructiva, requiere
   crear un nuevo topic (p. ej. `transfer-events-v2`) para no romper consumidores antiguos.
 
 ---
@@ -355,9 +355,9 @@ sin borrar de inmediato las anteriores).
 
 **Consecuencias:**
 
-- *Positivas:* trazabilidad exacta de las versiones de la base de datos; despliegues
+- _Positivas:_ trazabilidad exacta de las versiones de la base de datos; despliegues
   repetibles e idempotentes.
-- *Negativas / Deuda:* requiere disciplina estricta al escribir los scripts SQL en el
+- _Negativas / Deuda:_ requiere disciplina estricta al escribir los scripts SQL en el
   directorio `db/migration`.
 
 ---
