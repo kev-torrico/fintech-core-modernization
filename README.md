@@ -1,4 +1,4 @@
-# FinBank — Reto Práctico 4: Migración a Microservicios
+# FinBank — Migración a Microservicios
 
 Modernización progresiva del monolito modular **FinBank** hacia una arquitectura de
 microservicios, aplicando **Strangler Fig**, comunicación **asíncrona vía Kafka**,
@@ -31,10 +31,10 @@ Se aplicó **Strangler Fig** en dos cortes sucesivos, dejando Auth/Accounts/Audi
 el **core remanente** en el monolito (alto riesgo transaccional, no se extraen) y
 sacando dos dominios periféricos y de alta tasa de cambio:
 
-| Orden | Módulo extraído | Microservicio      | Razón principal                                                                                                                                       |
-| ----- | --------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Orden | Módulo extraído | Microservicio      | Razón principal                                                                                                                                                                                                      |
+| ----- | --------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1     | Notificaciones  | `ms-notifications` | Bajo riesgo, dominio autónomo, tolerante a consistencia eventual — valida la infraestructura de eventos sin arriesgar el core bancario ([ADR-001](docs/adr/0002-decisiones-arquitectura-microservicios.md#adr-001)). |
-| 2     | Transferencias  | `ms-transfers`     | Alta carga transaccional y necesidad de escalar horizontalmente, aislado de fallos del resto del sistema ([ADR-002](docs/adr/0002-decisiones-arquitectura-microservicios.md#adr-002)).                              |
+| 2     | Transferencias  | `ms-transfers`     | Alta carga transaccional y necesidad de escalar horizontalmente, aislado de fallos del resto del sistema ([ADR-002](docs/adr/0002-decisiones-arquitectura-microservicios.md#adr-002)).                               |
 
 **Decisiones clave** (detalle completo en el [registro de ADR](docs/adr/0002-decisiones-arquitectura-microservicios.md)):
 
@@ -352,7 +352,7 @@ Contrato de eventos (JSON plano, sin _envelope_, versionado por topic/ruta):
 ## Estructura del repositorio
 
 ```
-Reto_Practico_4/
+fintech-core-modernization/
 ├── api-gateway/          # Spring Cloud Gateway — JWT, ruteo, OpenAPI unificado
 ├── finbank-monolith/     # Monolito remanente: Auth, Accounts, Audit
 ├── ms-notifications/     # 1er microservicio extraído (Strangler Fig)
@@ -369,7 +369,7 @@ Reto_Practico_4/
 - [`docs/adr/0002-decisiones-arquitectura-microservicios.md`](docs/adr/0002-decisiones-arquitectura-microservicios.md) —
   registro completo de ADR-001 a ADR-011 (contexto, opciones evaluadas, decisión y
   consecuencias de cada una de las 11 decisiones de arquitectura) y el análisis de
-  trade-offs final del reto (consistencia vs. disponibilidad, reversibilidad de las
+  trade-offs final (consistencia vs. disponibilidad, reversibilidad de las
   decisiones, módulos que se decidió no extraer).
 - [`docs/adr/0001-observability-stack.md`](docs/adr/0001-observability-stack.md) —
   ADR técnico detallado del stack de trazas/métricas/logs (ADR-009).
